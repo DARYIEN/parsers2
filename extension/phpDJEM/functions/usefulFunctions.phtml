@@ -1,0 +1,119 @@
+<?php
+	// Подготавливает текст тизера (анонс объявления)
+	function prepareTeaser($text, $limit) {
+		// Обрезаем текст по словам
+		$textLength = (mb_strlen($text) > $limit) ? mb_strripos(mb_substr($text, 0, $limit), ' ') : $limit;
+		$text = mb_substr($text, 0, $textLength);
+		// Очищаем теги
+		$text = strip_tags($text);
+		// Удаляем лишние пробелы
+		$text = preg_replace("/\t/", " ", $text);
+		$text = preg_replace("/\s{2,}/", " ", $text);		
+		// Обрезаем пробелы по краям
+		$text = trim($text) . '...';
+		
+		$text = upperFirstLetter($text);
+	
+		return $text;
+	}
+	
+	// Делает первый символ в предложении заглавным
+	function upperFirstLetter($text) {
+		$words = explode(' ', trim($text));
+		$words[0] = mb_convert_case($words[0], MB_CASE_TITLE, "UTF-8");
+		return implode(' ', $words); 
+	}
+		
+	// Возвращает "человеческое" название типа объявления
+	function getTypeName($type) {
+		switch($type) {
+			case 'prodam':
+				$typeName = 'Продам';
+			break;
+			case 'kuplu':
+				$typeName = 'Куплю';
+			break;
+			case 'pred_uslugi':
+				$typeName = 'Предложение услуг';
+			break;
+			case 'Spros_uslugi':
+				$typeName = 'Спрос услуг';
+			break;
+			case 'other':
+				$typeName = 'Другое';
+			break;
+		}
+		return $typeName;
+	}	
+	
+	/*
+		$numberOfPages - общее число страниц
+		$currentPage - текущая страница
+		$pagesNum - число страниц в паджинаторе
+	*/
+	function paginator($numberOfPages, $currentPage, $pagesNum) {
+		if($numberOfPages > 1) {		
+			$pager = '<div id="pager" class="blueLinks">';
+				if($currentPage > $numberOfPages) {
+					$pager .= '<div class="center">Такой страницы не существует</div>';
+				} else {
+					$pager .= '<div style="margin: 0 0 10px 0;">';
+						if($currentPage-1 >= 1 ) {
+							$pager .= ' &larr; <a href="' . sgp('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 'page', $currentPage-1) . '" title="Предыдущая">предыдущая</a>';
+						} else {
+							$pager .= '<span class="grey">&larr; предыдущая</span>';
+						}
+						$pager .= '<strong style="margin:0 20px 0 20px;">Страница ' . $currentPage . ' из ' . $numberOfPages . ' </strong>';
+						if($currentPage+1 <= $numberOfPages) {
+							$pager .= ' <a href="' . sgp('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 'page', $currentPage+1) . '" title="Следующая">следующая</a>&rarr;';
+						} else {
+							$pager .= '<span class="grey">следующая &rarr;</span>';
+						}							
+					$pager .= '</div>';
+					
+					$pager .= '<div class="pages">';
+						if($currentPage-$pagesNum/2-1 > 1) {
+							$pager .= ' <a href="' . sgp('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 'page', $currentPage-$pagesNum/2-1) . '">...</a> ';
+						}																					
+						if($currentPage-$pagesNum/2 <= 1) {
+							$from =  1;
+							$to = $pagesNum;
+						} elseif($currentPage+$pagesNum/2 >= $numberOfPages) {								
+							$from = $currentPage - $pagesNum + $numberOfPages-$currentPage;
+							$to = $numberOfPages;
+						} else {
+							$from = $currentPage-$pagesNum/2;
+							$to = $currentPage+$pagesNum/2;								
+						}							
+						for($i=$from; $i<=$to; $i++) {
+							if($i > 0 && $i <= $numberOfPages) {
+								if($i != $currentPage) {
+									$pager .= ' <a href="' . sgp('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 'page', $i) . '" ' . $class . '>' . $i . '</a> ';
+								} else {
+									$pager .= ' <span class="currentPage">' . $i . '</span> ';
+								}	
+							} 	
+						}
+						if($currentPage+$pagesNum/2+1 < $numberOfPages) {
+							$pager .= ' <a href="' . sgp('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'], 'page', $currentPage+$pagesNum/2+1) . '">...</a>';
+						}			
+					$pager .= '</div>';
+				}	
+			$pager .= '</div>';
+		}	
+		
+		return $pager;
+	}
+	
+	function transliterate($textcyr = null, $textlat = null) {
+	    $cyr = array(
+	    'ж',  'ч',  'щ',   'ш',  'ю',  'а', 'б', 'в', 'г', 'д', 'e', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'р', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ъ', 'ь', 'я',
+	    'Ж',  'Ч',  'Щ',   'Ш',  'Ю',  'А', 'Б', 'В', 'Г', 'Д', 'Е', 'З', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х', 'Ц', 'Ъ', 'Ь', 'Я', ' ');
+	    $lat = array(
+	    'zh', 'ch', 'sht', 'sh', 'yu', 'a', 'b', 'v', 'g', 'd', 'e', 'z', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 's', 't', 'u', 'f', 'h', 'c', 'y', 'x', 'q',
+	    'Zh', 'Ch', 'Sht', 'Sh', 'Yu', 'A', 'B', 'V', 'G', 'D', 'E', 'Z', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'F', 'H', 'c', 'Y', 'X', 'Q', '_');
+	    if($textcyr) return str_replace($cyr, $lat, $textcyr);
+	    else if($textlat) return str_replace($lat, $cyr, $textlat);
+	    else return null;
+	}
+?>

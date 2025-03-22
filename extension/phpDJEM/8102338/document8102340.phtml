@@ -1,0 +1,82 @@
+<?php
+	//Create new Ad in database
+	function createAd($ad) {        
+	    prepareAdFields($ad);
+	    
+	    if(!checkAd($ad)) {
+	        $newDoc = new DJEMDocument($djem);
+	        $ad['cities'] = getCitiesFromAd($ad);
+	        
+	        $newDoc->_parent_id = 387286;
+	        $newDoc->_type = 7647734;
+	        $newDoc->_name = $ad['title'];
+	        $newDoc->org = $ad['org'];
+	        $newDoc->txt = $ad['content'];
+	        $newDoc->typo = $ad['type'];
+	        $newDoc->telephone = $ad['phone'];
+	        $newDoc->categories = $ad['categories'];
+	        $newDoc->_url = '/tmp/null';
+	        $newDoc->_file = '/tmp/null';
+	        
+	        if($ad['userId'] > 0) {
+	        	$newDoc->authorId = $ad['userId'];
+	        }	
+	        $newDoc->cities = $ad['city'];	        	        
+            $newDoc->_publish_time = time();
+	        	        
+	        $newDocId = $newDoc->Store();	
+	        //R('DJEMServer')->PublishDocument($newDocId);
+	        	        
+	        $result['message'] = "Объявление добавлено.";
+	        $result['status'] = 1;
+	    } else {
+	    	$result['message'] = "Ваше объявление уже размещено.";
+	    	$result['status'] = 0;
+	    }	
+	    return $result;    
+	}
+	
+	//Checks Ad for dublicates
+	function checkAd($ad) {        
+	   $query = R('DJEM')->GetForeach();
+	   $query->Path('main.Advertisement.$')->Where('_name="?"', $ad['title']);
+	   
+	   return sizeof($query) ? 1 : 0;
+	}
+	
+	//Fix, format and prepare fields before publishing Ad
+	function prepareAdFields($ad) {
+	    $ad['title'] = trim(html_entity_decode($ad['title'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	    $ad['org'] = trim(html_entity_decode($ad['org'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	    $ad['content'] = trim(html_entity_decode($ad['content'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	}
+
+	//Returns array with cities
+	function getCitiesFromAd($ad) {   
+	    $content = strip_tags($ad['town']);
+	    $allCities = R('DJEM')->GetForeach()->Path('main.metal.city.$');    
+	    $adCities = Array();
+	    $charsToScreen = '/ ';
+	    
+	    if(!empty($content)) {
+	        foreach ($allCities as $city) {
+	            if (strlen($city->_name) > 0) {
+	                preg_match('/' . addcslashes(trim($city->_name), $charsToScreen) . '/iu', $content, $matches);
+	                if(!empty($matches) && !empty($matches[0])) {
+	                    $adCities[$city->_id] = $city->_name;                    
+	                } else {
+	                    $tags = explode("\n", $city->tags);
+	                    foreach($tags as $tag) {
+	                        preg_match('/' . addcslashes(trim($tag), $charsToScreen) . '/iu', $content, $matches);
+	                        if(!empty($matches) && !empty($matches[0])) {
+	                            $adCities[$city->_id] = $city->_name;                    
+	                        }
+	                    }
+	                }
+	            }
+	        }
+	    }
+	        
+	    return $adCities;
+	}
+?>

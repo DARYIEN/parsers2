@@ -1,0 +1,101 @@
+<?php
+	//Checking form fields
+	if($_POST['title'] && $_POST['username'] && $_POST['town'] && $_POST['email'] && $_POST['phone'] && $_POST['org'] && $_POST['type'] && $_POST['content']) {
+		//If password defined then create Ad and authorize User
+		if($_POST['password']) {			
+			$_POST['status'] = createAd($_POST);
+		//Overwise create Ad and new User
+		} else {
+			$_POST['status'] = (createAd($_POST) && createUser($_POST)) ? 1 : 0;
+		}	  	
+	}	
+		
+	//Creates new User in database	
+	function createUser($data) {		
+		$newDoc = new DJEMDocument($djem);
+        
+        $newDoc->_parent_id = 148;
+        $newDoc->_type = 149;
+        $newDoc->_name = $_POST['username'];
+        $newDoc->name_org = $_POST['org'];
+        $newDoc->telefon = $_POST['phone'];
+        $newDoc->email = $_POST['email'];
+        $newDoc->password = generatePassword(8);
+        //$newDoc->confirmationKey = md5(uniqid() . time());
+                       
+        $newDocId = $newDoc->Store();
+        
+    	R('DJEMServer')->PublishDocument($newDocId, $newDoc->_dtpl_id);	
+    	return true;
+	}	
+	
+	//Create new Ad in database
+	function createAd($ad) {        
+	    prepareAdFields($ad);
+	    
+	    if(!checkAd($ad)) {
+	        $newDoc = new DJEMDocument($djem);
+	        
+	        $newDoc->_parent_id = 387286;
+	        $newDoc->_type = 7647734;
+	        $newDoc->_name = $_POST['title'];
+	        $newDoc->org = $_POST['org'];
+	        $newDoc->adres = $_POST['town'];
+	        $newDoc->txt = $_POST['content'];
+	        $newDoc->typo = $_POST['type'];
+	        $newDoc->telephone = $_POST['phone'];
+	        
+	        $newDocId = $newDoc->Store();	        
+	        
+	        $_POST['message'] = "Объявление добавлено";
+	        return true;
+	    } else {
+	    	$_POST['message'] = "Ваше объявление уже размещено";
+	    	return false;
+	    }	    
+	}
+	
+	//Checks Ad for dublicates
+	function checkAd($ad) {        
+	   $query = R('DJEM')->GetForeach();
+	   $query->Path('main.Advertisement.$')->Where('_name="' . $ad['title'] . '"');
+	   
+	   return sizeof($query) ? 1 : 0;
+	}
+	
+	//Checks user pass
+	function checkUserPassword($user) {
+		$query = R('DJEM')->GetForeach();
+		$query->Path('main.users.$')->Where('_email="' . $user['email'] . '"');
+	   
+	   	return sizeof($query) ? 1 : 0;	
+	}
+	
+	//Fix, format and prepare fields before publishing Ad
+	function prepareAdFields($ad) {
+	    $ad['title'] = trim(html_entity_decode($ad['title'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	    $ad['org'] = trim(html_entity_decode($ad['org'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	    $ad['content'] = trim(html_entity_decode($ad['content'], ENT_COMPAT | ENT_HTML401, 'UTF-8'));
+	}
+	
+	//Password generator
+	function generatePassword($number) {
+		$arr = array('a','b','c','d','e','f',
+		             'g','h','i','j','k','l',
+		             'm','n','o','p','r','s',
+		             't','u','v','x','y','z',
+		             'A','B','C','D','E','F',
+		             'G','H','I','J','K','L',
+		             'M','N','O','P','R','S',
+		             'T','U','V','X','Y','Z',
+		             '1','2','3','4','5','6',
+		             '7','8','9','0');
+		$pass = "";
+		for($i = 0; $i < $number; $i++) {		  
+		  $index = rand(0, count($arr) - 1);
+		  $pass .= $arr[$index];
+		}
+		
+		return $pass;
+  	}
+?>

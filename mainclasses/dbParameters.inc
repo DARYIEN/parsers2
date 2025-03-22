@@ -1,0 +1,1 @@
+a:5:{s:4:"user";s:4:"root";s:8:"password";s:0:"";s:4:"name";s:18:"dbname=dictionary;";s:4:"host";s:14:"host=localhost";s:4:"type";s:6:"mysql:";}

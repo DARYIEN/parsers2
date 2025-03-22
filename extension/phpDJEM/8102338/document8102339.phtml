@@ -1,0 +1,82 @@
+<?php
+	//Creates new User in database	
+	function createUser($data) {		
+		if($data['password']) {
+			$password = $data['password'];
+		} else {
+			$password = generatePassword(8);
+		}	
+	
+		$newDoc = new DJEMDocument($djem);
+        
+        $newDoc->_parent_id = 148;
+        $newDoc->_type = 149;
+        $newDoc->_name = $data['email'];
+        $newDoc->persona = $data['username'];
+        $newDoc->name_org = $data['org'];
+        $newDoc->_link1 = $data['city'];
+        $newDoc->telefon = $data['phone'];
+        $newDoc->email = $data['email'];   
+        $newDoc->url = preg_replace('#^https?://#', '', $data['url']);
+        $newDoc->legalEntity = $data['legalEntity'];     
+        $newDoc->password = md5($password);
+        $newDoc->_publish_time = time();        	
+                       
+        $newDocId = $newDoc->Store();        
+        R('DJEMServer')->PublishDocument($newDocId);  
+        
+        $subject = 'Информация о Вашей учетной записи на сайте metal100.ru';
+        $message = '
+        	Здравствуйте, ' . $data['username'] .'!<br/><br/>
+        	Вы зарегистрировалилсь на сайте metal100.ru<br/><br/>
+			Информация о Вашей учетной записи:<br/>
+			Логин: ' . $data['email'] . '<br/>
+			Пароль: ' . $password . '<br/><br/>
+			Сслыка для быстрого входа: <a href="http://metal100.ru/system/php/service.php?f=fastlogin&code=' . md5($password) .'">http://metal100.ru/system/php/service.php?f=fastlogin&code=' . md5($password) .'</a>'
+		;
+		$headers   = array();
+		$headers[] = "MIME-Version: 1.0";
+		$headers[] = "Content-type: text/html; charset=utf-8";
+		$headers[] = "From: Metal100.ru <info@metal100.ru>";
+        
+        mail($data['email'], $subject, $message, implode("\r\n", $headers));
+        
+    	return $newDocId;
+	}			
+	
+	function createNewPassword($user) {
+		$password = generatePassword(8);		
+		$user->password = md5($password);
+		$user->Store();
+		return $password;
+	}
+	
+	//Checks user
+	function checkUser($user) {	
+		$query = R('DJEM')->GetForeach();
+		$query->Path('main.users.$')->Where('_name="' . $user['email'] . '"');
+	  
+	   	return sizeof($query) ? 1 : 0;	
+	}
+	
+	//Password generator
+	function generatePassword($number) {
+		$arr = array('a','b','c','d','e','f',
+		             'g','h','i','j','k','l',
+		             'm','n','o','p','r','s',
+		             't','u','v','x','y','z',
+		             'A','B','C','D','E','F',
+		             'G','H','I','J','K','L',
+		             'M','N','O','P','R','S',
+		             'T','U','V','X','Y','Z',
+		             '1','2','3','4','5','6',
+		             '7','8','9','0');
+		$pass = "";
+		for($i = 0; $i < $number; $i++) {		  
+		  $index = rand(0, count($arr) - 1);
+		  $pass .= $arr[$index];
+		}
+		
+		return $pass;
+  	}
+?>

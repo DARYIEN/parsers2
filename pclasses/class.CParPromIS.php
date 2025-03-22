@@ -1,0 +1,103 @@
+<?php
+/**
+ * Created by ~[M!sterX@#]~.
+ * Date: 08.07.13
+ * Time: 12:44
+ */
+
+class CParPromIS extends CParMain{
+    var $city_id;
+    static $name_parser = array(
+        'PROMIS' => 'Пром Инвест Cтрой'
+    );
+    function start(){
+        $this->getDocument()->processParsing();
+        $mail[$this->city_id] = '<br /><h4>'.current(array_values(self::$name_parser)).'  (City = '.current(array_values($this->cities_list[$this->city_id])).' Price id = '.$this->price_id.' link = '.$this->document_url.')</h4>';
+        $mail[$this->city_id] .= '<br /><a href="'.$this->our_link.$this->dirArray['full'].'/'.$this->document_name.'">FULL_POS ('.count($this->to_save).')</a>';
+        if(!empty($this->to_save_new)){
+            $mail[$this->city_id] .= '<br /><a href="'.$this->our_link.$this->dirArray['new_pos'].'/new_pos_'.$this->document_name.'">NEW_POS ('.count($this->to_save_new).')</a>';
+        }
+        return $mail;
+    }
+    function __construct(){
+        foreach($this->list_parsers as $city_id => $parser){
+            if(in_array(get_class($this), $parser)){
+                $this->city_id = $city_id;
+                break;
+            }
+        }
+        $this->formDirsArray()->createDirs();
+        $this->document_extended = '.xls';
+        $this->document_name = current(array_keys(self::$name_parser)).'_'.date('d-m-Y', time()).'_'.time().'.csv';
+        $this->document_url = 'http://prominveststroy.com/price_m.xls';
+        //$this->coef = 1000;
+        $this->dual_cost = true;
+        $this->price_id = 9964614;
+    }
+    function formDirsArray(){
+        $this->dirArray['root'] = '/files/'.current(array_keys($this->cities_list[$this->city_id])).'/'.current(array_keys(self::$name_parser));
+        $this->dirArray['full'] = $this->dirArray['root'].'/price_full';
+        $this->dirArray['new_pos'] = $this->dirArray['root'].'/price_new_position';
+        $this->dirArray['temp'] = $this->dirArray['root'].'/temporary';
+        return $this;
+    }
+    function processParsing(){
+        $this->filter =  array(
+            'horizontal' => array(
+                'to' => array(
+                    'numeric' => 18,
+                    'cost' => 7,
+                    'char' => 'S'),
+                'from' => array(
+                    'numeric' => 1,
+                    'char' => 'B')),
+            'vertical' => array(
+                'to' => array(
+                    'numeric' => null),
+                'from' => array(
+                    'numeric' => 9))
+        );
+        $this->filter_subset = new MyReadFilter($this->filter);
+        $this->head_non = true;
+        foreach($this->document_list as $path){
+            $this->documentLoad($path);
+            PHPExcel_Settings::setLocale('ru');
+            $this->sheet = $this->objPHPExcel->getSheet(0)->toArray();
+            $this->documentParsing();
+        }
+        $this->save();
+    }
+    function documentParsing(){
+        $name = '';
+        $cost = array();
+        foreach($this->sheet as $num => $rows){
+            $rows = clear_array($rows);
+            //p($rows);
+            if($num==8) continue;
+            foreach($rows as $num_row => $row){
+                if(!empty($row)){
+                    if(in_array($num_row, array($this->filter['horizontal']['to']['cost'],$this->filter['horizontal']['to']['cost']-3))){
+                        $cost[] = (int) $row;
+                        //p($cost);
+                        if(empty($cost)){
+                            $name = '';
+                            $cost = array();
+                            continue 2;
+                        }
+                        continue;
+                    }
+                    if(in_array($num_row, array(2,$this->filter['horizontal']['to']['cost']-1,$this->filter['horizontal']['to']['cost']-2)) || $num_row > $this->filter['horizontal']['to']['cost']) continue;
+                    $name .= ' '.$row;
+
+                }
+            }
+            if(!empty($name)&& !empty($cost)){
+                $this->items[] = array('name' => preg_replace('/;/iu',',',preg_replace('/руб\./i',' ',preg_replace('/\s+/iu',' ',  $name))), 'cost' => $cost);
+            }
+            $name = '';
+            $cost = array();
+        }
+        //p($this->items);
+        //die();
+    }
+}

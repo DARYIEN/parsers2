@@ -1,0 +1,52 @@
+<?php
+	//Create new Order in database
+	function createOrder($order) {     	    	    
+        $newDoc = new DJEMDocument($djem);
+        
+        $newDoc->_parent_id = 8186528;
+        $newDoc->_type = 8186529;
+        $newDoc->clientName = $order['username'];
+        $newDoc->phone = $order['phone'];
+        $newDoc->org = $order['org'];
+        $newDoc->email = $order['email'];
+        $newDoc->comment = $order['comment'];
+        $newDoc->order = $order['order'];
+        $newDoc->_link1 = $order['userId'];
+        $newDoc->cities = $order['cities'];
+        $newDoc->delivery = $order['city'];
+        
+        $newDocId = $newDoc->Store();
+        $newDoc->_url = '/orders/' . $newDocId . '.phtml';
+        $newDoc->_file = '/orders/' . $newDocId . '.phtml';
+        $newDocId = $newDoc->Store();
+        //R('DJEMServer')->PublishDocument($newDocId);        
+        	        
+        $result['message'] = "Заявка принята, после проверки модератором она будет опубликована на сайте.";
+        $result['status'] = 1;
+        $result['id'] = $newDocId;
+        $result['url'] = $newDoc->_url;
+        
+		return $result;    
+	}
+	
+	//Create new Offer in database
+	function createOffer($offer) {
+		$newDoc = new DJEMDocument($djem);
+        
+        $newDoc->_parent_id = 8213891;
+        $newDoc->_type = 8213892;
+        $newDoc->offer = $offer['offer'];
+        $newDoc->phone = $offer['phone'];
+        $newDoc->comment = $offer['comment'];
+        $newDoc->_link1 = $offer['orderId'];
+        $newDoc->_link2 = $offer['userId'];        
+        
+        $newDocId = $newDoc->Store();
+        R('DJEMServer')->PublishDocument($newDocId);        
+        	        
+        $result['message'] = "Ответ на заявку принят.";
+        $result['status'] = 1;
+        
+		return $result;
+	}
+?>

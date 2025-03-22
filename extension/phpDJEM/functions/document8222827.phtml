@@ -1,0 +1,303 @@
+<?php 
+	//Функция для отправки писем
+	function sendEmail($type, $data) {
+		$headers   = array();
+		$headers[] = "MIME-Version: 1.0";
+        $headers[] = "Content-type: text/html; charset=\"windows-1251\"";
+        $headers[] = "From: Metal100.ru <no-reply@metal100.ru>";
+        $headers[] = "Content-Transfer-Encoding: 8bit"; 
+	 
+		switch($type) { 
+			//Извещение модератору о поступившей заявке
+			case 'orderNeedToBeVerified':
+				$client = R('DJEM')->Load($data['userId']);
+				$order = '';
+				foreach(json_decode($data['order']) as $orderItem) {
+					$category = R('DJEM')->Load($orderItem->id);				
+					$order .= '<li style="margin-bottom: 5px;">';
+					$order .= '<strong>' . $category->_name;
+					$order .= $orderItem->type ? ' ' . $orderItem->type : '';
+					$order .= '</strong>';
+					$order .= $orderItem->quantity ? '<br/>кол-во: ' . $orderItem->quantity . ' ' . $orderItem->unit  : '';
+					$order .= $orderItem->size ? '<br/>размер: ' . $orderItem->size : '';
+					$order .= $orderItem->length ? '<br/>длина: ' . $orderItem->length : '';
+					$order .= $orderItem->steelType ? '<br/>сталь: ' . $orderItem->steelType : '';
+					$order .= $orderItem->maxPrice ? '<br/>максимальная цена: ' . $orderItem->maxPrice : '';
+					if(!empty($orderItem->extra)) {
+						$order .= '<br/><em>Примечание: ' . $orderItem->extra . '</em>';
+					}
+					$order .= '</li>';					
+				}
+			
+				$subject = 'МОДЕРАТОРУ: Новая заявка на сайте metal100.ru';
+				$email = 'info@metal100.ru, menedger@metal100.ru';
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Новая заявка на покупку ожидает модерации!</h1>';				
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+				$message .= '<p>';				
+				$message .= 'Id заявки: <strong>' . $data['id'] . '</strong><br/>';
+				$message .= 'Автор заявки: <strong>' . $client->persona . '</strong> (id ' . $data['userId'] . ')';
+				$message .= $client->name_org ? '<br/>Организация: <strong>' . $client->name_org . '</strong>' : '';
+				$message .= '</p>';
+				$message .= '<h2>Состав заявки</h2>';
+				$message .= '<ol>' . $order . '</ol>';
+				if(!empty($data['comment'])) $message .= '<p><strong>Дополнительная информация о заказе:</strong><br/>' . $data['comment'] . '</p>';
+				$message .= '</div>';
+			break;
+		
+			//Извещение модератору о поступившей свободной заявке
+			case 'sendFreeFormOrderToModerator':
+				$client = R('DJEM')->Load($data['userId']);
+				$city = R('DJEM')->Load($data['city']);
+				$allCities = R('DJEM')->GetForeach()->Path('main.metal.city.$')->Sort('_name')->ToArray();
+				
+				foreach(explode(',', $data['cities']) as $providerCityId) {
+					$cities[] = $allCities[$providerCityId];
+				}
+				
+				$subject = 'МОДЕРАТОРУ: Поступила заявка в свободной форме';
+				$email = 'info@metal100.ru, menedger@metal100.ru';
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Новая заявка в свободной форме!</h1>';				
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px;">';
+				$message .= '<p>';				
+				$message .= 'Автор заявки: <strong>' . $client->persona . '</strong> (id ' . $data['userId'] . ')';
+				$message .= $client->name_org ? '<br/>Организация: <strong>' . $client->name_org . '</strong>' : '';
+				$message .= '</p><p>';		
+				$message .= 'Телефон: <strong>' . $data['phone'] . '</strong><br/>Email: <strong>' . $data['email'] . '</strong><br/>Город: <strong>' . $city->_name . '</strong>';
+				$message .= '</p>';
+				$message .= '<h2>Состав заявки:</h2>';
+				$message .= '<p>';
+				$message .= $data['order'];
+				$message .= '</p>';
+				$message .= '<p>';
+				$message .= 'Регионы поставщиков: ' . implode(', ', $cities);
+				$message .= '</p>';				
+				$message .= '</div>';	
+				$message .= '<p>Ссылка на приложенный файл:</p>';
+				$message .= '<p><a href="http://metal100.ru/download/orders/' . $data['filename'] . '">http://metal100.ru/download/orders/' . $data['filename'] . '</a></p>';							
+			break;
+		
+			//Письма заказчику о созданной заявке
+			case 'orderOnModeration':
+				$client = R('DJEM')->Load($data['userId']);
+				
+				$subject = 'Ваша заявка на покупку №' . $data['id'] . ' на портале metal100.ru';
+				$email = $client->email;
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Ваша заявка проходит модерацию</h1>';
+				$message .= '<p><strong>Добрый день, ' . $client->persona . '!</strong></p>';				
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+				$message .= '<p>Сразу после проверки модератором Ваша заявка будет опубликована на сайте. Как только это произойдет мы сразу же Вас известим.</p>';
+				$message .= '<p>Id вашей заявки: <strong>' . $data['id'] . '</strong></p>';
+				$message .= '</div>';
+			break;
+		
+			//Письмо заказчику с информацией о успешной публикации заявки
+			case 'orderPublished':
+				$client = R('DJEM')->Load($data->_link1);
+				$order = '';
+				foreach(json_decode($data->order) as $orderItem) {
+					$category = R('DJEM')->Load($orderItem->id);				
+					$order .= '<li style="margin-bottom: 5px;">';
+					$order .= '<strong>' . $category->_name;
+					$order .= $orderItem->type ? ' ' . $orderItem->type : '';
+					$order .= '</strong>';
+					$order .= $orderItem->quantity ? '<br/>кол-во: ' . $orderItem->quantity . ' ' . $orderItem->unit : '';
+					$order .= $orderItem->size ? '<br/>размер: ' . $orderItem->size : '';
+					$order .= $orderItem->length ? '<br/>длина: ' . $orderItem->length : '';
+					$order .= $orderItem->steelType ? '<br/>сталь: ' . $orderItem->steelType : '';
+					$order .= $orderItem->maxPrice ? '<br/>максимальная цена: ' . $orderItem->maxPrice : '';
+					if(!empty($orderItem->extra)) {
+						$order .= '<br/><em>Примечание: ' . $orderItem->extra . '</em>';
+					}
+					$order .= '</li>';					
+				}
+				
+				$subject = 'Сравните предложения поставщиков по вашей заявке';
+				$email = $client->email;
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Поздравляем! Ваша заявка проверена модераторами и опубликована!</h1>';
+				$message .= '<p><strong>Добрый день, ' . $client->persona . '!</strong></p>';
+				$message .= '<p>Заявка была разослана поставщикам. Ответы на нее можно посмотреть на странице заявки перейдя по <a href="http://metal100.ru' . $data->_url . '?code=' . $client->password . '" target="_blank">специальной ссылке</a>.</p>';
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+				$message .= '<h2>Состав заявки</h2>';
+				$message .= '<ol>' . $order . '</ol>';
+				if(!empty($data->comment)) $message .= '<p><strong>Дополнительная информация о заказе:</strong><br/>' . $data->comment . '</p>';
+				$message .= '</div>';
+				$message .= '<a href="http://metal100.ru' . $data->_url . '?code=' . $client->password . '" target="_blank">Перейти к ответам поставщиков</a>';
+				
+			break;			
+
+			//Письмо заказчику с информацией о поступившем предложении от поставщика
+			case 'offer':
+				$order = R('DJEM')->Load($data['orderId']);
+				$orderItems = json_decode($order->order);
+				$client  = R('DJEM')->Load($order->_link1);
+				$seller  = R('DJEM')->Load($data['userId']);	
+				$offer = '';			
+				
+				foreach(json_decode($data['offer']) as $offerItemId=>$offerItem) {						
+					$category = R('DJEM')->Load($offerItem->id);
+					if(!empty($offerItem->price)) {
+						$offer .= '<li style="margin-bottom: 5px;">';					
+						$offer .= '<strong>' . $category->_name;
+						$offer .= $orderItems->{$offerItemId}->type ? ' ' . $orderItems->{$offerItemId}->type : '';
+						$offer .= '</strong>';
+						$offer .= $orderItems->{$offerItemId}->quantity ? '<br/>кол-во: ' . $orderItems->{$offerItemId}->quantity . ' ' . $orderItems->{$offerItemId}->unit  : '';
+						$offer .= $orderItems->{$offerItemId}->size ? '<br/>размер: ' . $orderItems->{$offerItemId}->size : '';
+						$offer .= $orderItems->{$offerItemId}->length ? '<br/>длина: ' . $orderItems->{$offerItemId}->length : '';
+						$offer .= $orderItems->{$offerItemId}->steelType ? '<br/>сталь: ' . $orderItems->{$offerItemId}->steelType : '';
+						$offer .= '<br/>Цена: <strong>' . $offerItem->price . ' руб.</strong>';
+						if(!empty($offerItem->unit)) {
+							$offer .= ' за ' . $offerItem->unit;
+						}
+						if(!empty($offerItem->cost)) {
+							$offer .= '<br/>Стоимость: <strong>' . $offerItem->cost . ' руб.</strong>';
+						}
+						$offer .= '</li>';
+					}
+				}				
+				
+				$subject = 'На Вашу заявку ответил поставщик';
+				$email = $client->email;
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>На вашу заявку ответил поставщик</h1>';
+				$message .= '<p><strong>Добрый день, ' . $client->persona . '!</strong></p>';
+				$message .= '<p>Вы получили ответ поставщика. Ответы всех поставщиков на заявку можно посмотреть на странице заказа перейдя по <a href="http://metal100.ru' . $order->_url . '?code=' . $client->password . '" target="_blank">специальной ссылке</a>.</p>';				
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+				$message .= '<p><strong>Поставщик:</strong> ' . ($seller->name_org ? $seller->name_org : $seller->persona) . ' (телефон: ' . $data['phone'] . ', e-mail: ' . $seller->email;				
+				$message .= $seller->url ? ', сайт компании: <a href="http://' . $seller->url . '">' . $seller->url . '</a>' : '';
+				$message .= ')</p>';
+				$message .= '<h2>Стоимость:</h2>';
+				$message .= '<ol>' . $offer . '</ol>';
+				if(!empty($data['comment'])) $message .= '<p><strong>Дополнительная информация о поставке:</strong><br/>' . $data['comment'] . '</p>';
+				$message .= '</div>';
+				$message .= '<a href="http://metal100.ru' . $order->_url . '?code=' . $client->password . '" target="_blank">Перейти к ответам поставщиков</a>';
+				$message .= '<div style="margin-top: 20px;">';
+				$message .= '<em>Если Вы больше не желаете получать ответы на эту заявку, перейдите по ссылке ниже чтобы закрыть ее.<br/><a href="http://metal100.ru/actions/closeOrderById.phtml?orderId=' . $order->_id . '&code=' . $client->password . '">Закрыть заявку</a></em>';
+				
+				$message .= '</div>';		
+
+			break;						
+			
+			case 'newPricelist':
+				$subject = 'Новый прайс-лист с сайта metal100.ru';
+				$email = 'info@metal100.ru';
+			
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Новый прайс-лист!</h1>';		
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+				$message .= '<p>Отправитель ввел следующие данные:</p>';
+				$message .= '<ul>';
+					if(!empty($data['town'])) $message .= '<li>Город: ' . $data['town'] . '</li>';
+					if(!empty($data['phone'])) $message .= '<li>Телефон: ' . $data['phone'] . '</li>';
+					if(!empty($data['email'])) $message .= '<li>E-mail: ' . $data['email'] . '</li>';
+					if(!empty($data['org'])) $message .= '<li>Организация: ' . $data['org'] . '</li>';
+					if(!empty($data['username'])) $message .= '<li>Контактное лицо: ' . $data['username'] . '</li>';
+				$message .= '</ul>';
+				$message .= '<p>Ссылка на прайс-лист:</p>';
+				$message .= '<p><a href="http://metal100.ru/download/pricelists/' . $data['filename'] . '">http://metal100.ru/download/pricelists/' . $data['filename'] . '</a></p>';
+				$message .= '</div>';
+			break;
+			
+			case 'ordersToSubscribers':				
+				$user = $data['user'];
+				$categories = $data['categories'];
+				$orderData = json_decode($data['order']->order);				
+				
+				$userCategories = explode(',', $user->categories);				
+				
+				foreach((array) $orderData as $orderItem) {
+					$orderCategories[] = $orderItem->id;
+				}				
+				
+				$interestingCategories = array_intersect(array_unique(array_values($orderCategories)), $userCategories);				
+				if(sizeof($interestingCategories) > 0) {										
+					$subject = 'Заявка на покупку металлопроката №' . $data['order']->_id . ' от ' . date('d.m.Y');
+					$email = $user->email;																					
+					
+					$order = '';
+					foreach($orderData as $orderItem) {						
+						$order .= '<li style="margin-bottom: 5px;">';
+						$order .= '<strong>' . $categories[$orderItem->id];
+						$order .= $orderItem->type ? ' ' . $orderItem->type : '';
+						$order .= '</strong>';
+						$order .= $orderItem->quantity ? '<br/>кол-во: ' . $orderItem->quantity . ' ' . $orderItem->unit  : '';
+						$order .= $orderItem->size ? '<br/>размер: ' . $orderItem->size : '';
+						$order .= $orderItem->length ? '<br/>длина: ' . $orderItem->length : '';
+						$order .= $orderItem->steelType ? '<br/>сталь: ' . $orderItem->steelType : '';
+						$order .= $orderItem->maxPrice ? '<br/>максимальная цена: ' . $orderItem->maxPrice : '';
+						if(!empty($orderItem->extra)) {
+							$order .= '<br/><em>Примечание: ' . $orderItem->extra . '</em>';
+						}
+						$order .= '</li>';
+					}
+					
+					$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+					$message .= '<h1>Заявка на покупку металлопроката</h1>';
+					$message .= '<p><strong>Добрый день, ' . ($user->name_org ? $user->name_org : $user->persona) . '!</strong></p>';
+					$message .= '<p>Вам пришла <a href="http://metal100.ru' . $data['order']->_url . '?code=' . $user->password . '" target="_blank">заявка с сайта Metal100.ru</a>. От Вас ждут ответа.</p>';										
+					$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';
+					$message .= '<h2>Заказчик:</h2>';
+					$message .= '<p>Контактное лицо: <strong>' . $data['order']->clientName . '</strong> <br/>Телефон: <a href="http://metal100.ru' . $data['order']->_url . '?code=' . $user->password . '" target="_blank">кликните сюда чтобы посмотреть телефон заказчика</a></p>';
+					$message .= '<h2>Состав заказа:</h2>';
+					$message .= '<ol>' . $order . '</ol>';
+					$message .= '<p>Если Вы можете продать что-либо из этого списка, <a href="http://metal100.ru' . $data['order']->_url . '?code=' . $user->password . '" target="_blank">ответьте на заявку</a></p>';
+					$message .= '</div>';					
+					$message .= '<em>Отписаться от рассылки можно в Вашем личном кабинете на портале <a href="http://metal100.ru/cabinet/subscribtions/">metal100.ru</a>.</em>';										
+					$message .= '<p style="margin-top: 20px;">Для авторизации и получения доступа к заявкам покупателей, а также получения целевых звонков покупателей и переходов на Ваш сайт, просим Вас выбрать удобные для Вас условия размещения информации о Вашем предприятии.<br/><a href="http://metal100.ru/advertising/">http://metal100.ru/advertising/</a><br/>В том числе размещение Вашего прайс листа с Вашими ценами и видами продукции.</p>';
+					
+					//$message .= '<p style="margin-top: 20px;"><strong>Внимание!</strong><br/>В целях исключения мошенничества на рынке металлопроката через сервисы портала Метал100  -  с 1 марта 2014 года  произойдёт отключение рассылки Заявок покупателей в адрес не авторизованных поставщиков. Для авторизации не обходимо связаться с нами по телефону  +7 (499) 236-45-14,  8 800 333 18 40 или пишите на адрес почты info@metal100.ru</p>';
+				}									
+			break;
+			
+			case 'sendNewPasswordToUser': 
+				$user = $data['user'];
+				
+				$subject = 'Metal100.ru, новый пароль';
+				$email = $user->email;		
+				
+				$message  = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Ваш новый пароль!</h1>';
+				$message .= '<p><strong>Добрый день, ' . $user->persona . '!</strong></p>';
+				$message .= '<p>Ваши пользовательские данные:</p>';										
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';				
+				$message .= '<p>Логин: ' . $user->_name . '<br/>Пароль: ' . $data['password'] . '</p>';				
+				$message .= '</div>';
+				$message .= '<p>Изменить пароль Вы можете в личном кабинете.</p>';
+			break;
+			
+			case 'sendWrongPriceReport':				
+				$subject = 'Неверная цена на сайте metal100.ru!';
+				$email = 'info@metal100.ru, leon-gorb@mail.ru, work@ivanm.ru';
+				
+				$person = !empty($data['reporter']->_id) ? $data['reporter']->persona . ' (id ' . $data['reporter']->_id . ')' : '(анонимный)';
+				$url = R('DJEM')->Load($data['priceItem']->fit2)->_url;
+				$city = R('DJEM')->Load($data['priceItem']->city);
+				if($city->_id != 4344728) {					
+					$url = 'http://' . $city->eng_name . '.metal100.ru' . $url;
+				} else {
+					$url = 'http://metal100.ru' . $url;
+				}
+				
+				$message = '<img src="http://metal100.ru/image/logotip.png"/>';
+				$message .= '<h1>Обнаружена неверная цена!</h1>';
+				$message .= '<p><strong>Пользователь ' . $person . ' сообщил о неверной цене</strong></p>';
+				$message .= '<div style="border: solid #CCC 1px; padding: 0 20px 0 20px; margin-bottom: 20px; ">';				
+				$message .= '<p>' . $data['priceItem']->fit3 . ', розница: <strong>' . ($data['priceItem']->retail ? $data['priceItem']->retail : '-') .'</strong>, опт: <strong>' . ($data['priceItem']->wholesale ? $data['priceItem']->wholesale : '-') .'</strong></p>';								
+				$message .= '<p>Id позиции в прайс-листе: <strong>' . $data['priceItem']->_id . '</strong></p>';	
+				$message .= '<table style="border: 1px solid #CCCCCC; margin-bottom: 10px;" cellpadding="5"><tr>' . $data['tableRow'] . '</tr></table>';
+				$message .= '</div>';
+				$message .= 'Адрес страницы с неверной ценой: <a href="' . $url . '">' . $url . '</a> (' . $city->_name . ')';
+			break;
+		}				
+		
+		mail($email, iconv('UTF-8', 'windows-1251', $subject), iconv('UTF-8', 'windows-1251', $message), implode("\r\n", $headers), '-fno-reply@metal100.ru');
+	}
+?>
